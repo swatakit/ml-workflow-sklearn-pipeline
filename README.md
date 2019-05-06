@@ -14,7 +14,10 @@ Python 3.X
 
 This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
 
-## Acknowledgments
-
+## Credits
+Zac Stewart
+Julie Michelman 
+Kevin Goetsch
+Kevin Markham
 
 
