@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from functools import reduce
 
-from sklearn.base import TransformerMixin
+from sklearn.base import TransformerMixin, BaseEstimator
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.preprocessing import FunctionTransformer, StandardScaler, RobustScaler
 from sklearn.preprocessing import Imputer, MultiLabelBinarizer
@@ -46,7 +46,7 @@ class DFFeatureUnion(TransformerMixin):
         return Xunion
 
 
-class DFImputer(TransformerMixin):
+class DFImputer(TransformerMixin, BaseEstimator):
     # Imputer but for pandas DataFrames
 
     def __init__(self, strategy='mean'):

@@ -8,8 +8,9 @@ import seaborn as sns
 import datetime
 
 from sklearn.cluster import MiniBatchKMeans
-from sklearn.metrics import roc_auc_score,roc_curve,precision_recall_curve, auc
-from sklearn.metrics import classification_report, confusion_matrix , average_precision_score, accuracy_score,silhouette_score
+from sklearn.metrics import (roc_auc_score,roc_curve,precision_recall_curve, auc,
+                             classification_report, confusion_matrix, average_precision_score,
+                             accuracy_score,silhouette_score,mean_squared_error)
 from sklearn.utils.fixes import signature
 
 def print_classification_performance2class_report(model,X_test,y_test):
@@ -32,11 +33,14 @@ def print_classification_performance2class_report(model,X_test,y_test):
     FS = 2 *((PC*RC)/(PC+RC))
     AP = average_precision_score(y_test,y_pred)
     ACC = accuracy_score(y_test,y_pred)
+    RMSE = np.sqrt(mean_squared_error(y_test, y_pred))
+    
     print("Accuracy:{:.2%}".format(ACC))
     print("Precision:{:.2%}".format(PC))
     print("Recall:{:.2%}".format(RC))
     print("Fscore:{:.2%}".format(FS))
     print("Average precision:{:.2%}".format(AP))
+    print('The RMSE value is {:.4f}'.format(RMSE))
     
     fig = plt.figure(figsize=(20,3))
     fig.subplots_adjust(hspace=0.2,wspace=0.2)
@@ -90,7 +94,154 @@ def print_classification_performance2class_report(model,X_test,y_test):
     
     plt.show()
     
-    return ACC,PC,RC,FS,AP,roc_auc,gini
+    return ACC,PC,RC,FS,AP,roc_auc,gini,RMSE
 
 
+def generate_miss_report(data):
+    """ 
+        Program: print missing report
+        Author: Siraprapa W.
+        
+        Purpose: print missing report of a dataset
+    """
     
+    def set_nan(x):
+        ch_miss = ['n/a','na','n.a.','n.a','*','-','unknown'
+                   ,'email@domain.com','testuser','u','99999999'
+                   ,'null','none','c999','z_error','z_missing']
+        nm_miss = [99999999.0,-999.0]
+        
+        if type(x) is str :
+            if x.lower() in ch_miss :
+                return np.nan
+            else:
+                return x
+        elif x in nm_miss:
+             return np.nan
+        else:
+             return x
+    
+    data_dub = data.copy().applymap(set_nan)
+    n_miss  = data_dub.isnull().sum() 
+    n_miss = n_miss.reset_index()
+    p_miss  = data_dub.isnull().sum() / len(data_dub.index)
+    p_miss = p_miss.reset_index()
+    miss_report = pd.merge(n_miss,p_miss,how='inner',on='index')
+    miss_report.columns= ['feature','n_missing','p_missing']
+    miss_report['n_populated'] = len(data_dub.index) - miss_report['n_missing']
+    miss_report['p_populated'] = 1.0 - miss_report['p_missing']
+    
+    miss_report.plot(kind='bar',x='feature',y='p_populated',color='lightblue')
+    
+    print(data_dub.dtypes)
+    
+    return miss_report
+
+
+
+def print_gainlift_charts(data,var_to_rank,var_to_count_nonzero,intpl=False,silent=False):
+    """
+        Program: print_gainlift_charts
+        Author: Siraprapa W.
+        
+        Purpose:print gain lift charts   
+    """
+    n_qcut=10
+    if intpl==False:
+        tmpname = var_to_rank+'_tmp'
+        data[tmpname] = pd.qcut(data[var_to_rank],n_qcut,labels=False)
+        table = pd.pivot_table(data, 
+                                 index=[tmpname],
+                                 values=[var_to_rank,var_to_count_nonzero],
+                                 aggfunc={
+                                     var_to_rank:np.size,
+                                     var_to_count_nonzero:np.count_nonzero
+                                 }
+                                )
+        table_sorted = table.sort_index(ascending=False)
+        table_sorted['cumulative_response'] = table_sorted[var_to_count_nonzero].cumsum()
+        
+        table_sorted['nonresponse'] = table_sorted[var_to_rank]-table_sorted[var_to_count_nonzero]
+        table_sorted['cumulative_nonresponse'] = table_sorted['nonresponse'].cumsum()
+        
+        total_nonresponse = np.sum(table_sorted.loc[:,'nonresponse'])
+        table_sorted['percent_of_nonevents'] = (table_sorted['nonresponse']/total_nonresponse)
+        table_sorted['cumulative_percent_of_nonevents'] = table_sorted['percent_of_nonevents'].cumsum()
+        
+        total_response = np.sum(table_sorted.loc[:,var_to_count_nonzero])
+        table_sorted['percent_of_events'] = (table_sorted[var_to_count_nonzero]/total_response)
+        table_sorted['cumulative_percent_of_events'] = table_sorted['percent_of_events'].cumsum()
+        
+        table_sorted['cumulative_gain'] = (table_sorted['cumulative_response']/total_response)*100
+        decile = np.linspace(1,10,10)
+        table_sorted['decile'] = decile*10
+        table_sorted['cumulative_lift'] = table_sorted['cumulative_gain']/(table_sorted['decile'])
+        table_sorted.rename(columns={var_to_rank: 'counts'},inplace=True)
+        table_sorted['ks'] = np.abs(table_sorted['cumulative_percent_of_events']-table_sorted['cumulative_percent_of_nonevents'])
+        #table_sorted.set_index('decile')
+        
+    else:
+        list_binsize= []
+        list_counts = []
+        inspace_qcut= np.linspace(np.min(data[var_to_rank]),np.max(data[var_to_rank]),n_qcut)
+        for i in range(len(inspace_qcut)):
+            if i == (len(inspace_qcut)-1):
+                mask = (data[var_to_rank]>= (len(inspace_qcut)-1))
+                tocal = data.loc[mask,[var_to_rank,var_to_count_nonzero]]
+                size = np.size(tocal[var_to_rank])
+                counts = np.count_nonzero(tocal[var_to_count_nonzero])
+                list_binsize.append(size)
+                list_counts.append(counts)  
+
+            else:
+                mask = (data[var_to_rank]>=inspace_qcut[i]) & ( data[var_to_rank]<inspace_qcut[i+1])
+                tocal = data.loc[mask,[var_to_rank,var_to_count_nonzero]]
+                size = np.size(tocal[var_to_rank])
+                counts = np.count_nonzero(tocal[var_to_count_nonzero])
+                list_binsize.append(size)
+                list_counts.append(counts)
+            
+        table = pd.DataFrame([list_binsize,list_counts]).transpose()
+        table.columns = [var_to_rank,var_to_count_nonzero]
+
+        table_sorted = table.sort_index(ascending=False)
+        table_sorted['cumulative_response'] = table_sorted[var_to_count_nonzero].cumsum()
+        
+        table_sorted['nonresponse'] = table_sorted[var_to_rank]-table_sorted[var_to_count_nonzero]
+        table_sorted['cumulative_nonresponse'] = table_sorted['nonresponse'].cumsum()
+        
+        total_nonresponse = np.sum(table_sorted.loc[:,'nonresponse'])
+        table_sorted['percent_of_nonevents'] = (table_sorted['nonresponse']/total_nonresponse)
+        table_sorted['cumulative_percent_of_nonevents'] = table_sorted['percent_of_nonevents'].cumsum()
+        
+        total_response = np.sum(table_sorted.loc[:,var_to_count_nonzero])
+        table_sorted['percent_of_events'] = (table_sorted[var_to_count_nonzero]/total_response)
+        table_sorted['cumulative_percent_of_events'] = table_sorted['percent_of_events'].cumsum()
+        
+        table_sorted['cumulative_gain'] = (table_sorted['cumulative_response']/total_response)*100
+        decile = np.linspace(1,10,10)
+        table_sorted['decile'] = decile*10
+        table_sorted['cumulative_lift'] = table_sorted['cumulative_gain']/(table_sorted['decile'])
+        table_sorted.rename(columns={var_to_rank: 'counts'},inplace=True)
+        table_sorted['ks'] = np.abs(table_sorted['cumulative_percent_of_events']-table_sorted['cumulative_percent_of_nonevents'])
+    
+    table_sorted['base_lift']=1
+    table_sorted['base_gain']=[x for x in np.linspace(10,100,10)]
+    
+    #charts
+    if silent==False:
+
+        fig, axes = plt.subplots(nrows=1, ncols=2)
+        table_sorted.plot(kind='line',x='decile',y=['cumulative_lift','base_lift'],style='o-',
+                          ax=axes[0],figsize=(10,3),title='{} - Cumulative Lift Curve'.format(var_to_rank))
+        table_sorted.plot(kind='line',x='decile',y=['cumulative_gain','base_gain'],style='o-',
+                          ax=axes[1],figsize=(10,3),title='{} - Cumulative Gain Curve'.format(var_to_rank))
+
+
+        print(table_sorted.set_index('decile').loc[:,[var_to_count_nonzero,'cumulative_gain','cumulative_lift','ks']])
+    else:
+        pass
+    
+    return table_sorted.set_index('decile').drop(columns=['base_lift','base_gain'],axis=1)
+    
+#
