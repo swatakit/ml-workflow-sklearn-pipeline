@@ -31,7 +31,7 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 * https://www.youtube.com/watch?v=BFaadIqWlAg
 * https://www.youtube.com/watch?v=URdnFlZnlaE
 
-3. Zac Stewart blogs – of which he explains how he put 10 machine leaning in1 pipeline – This is his NLP 
+3. Zac Stewart blogs – of which he explains how he put 10 machine leaning in1 pipeline  
 * http://zacstewart.com/2014/08/05/pipelines-of-featureunions-of-pipelines.html
 
 4. This is my silly NLP ,of which I compare multiple models metrics – NLP/Sentiment /w and wo Pipeline, go to the bottom
