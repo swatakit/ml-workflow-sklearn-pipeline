@@ -128,46 +128,6 @@ def create_gainlift_table(data,var_to_rank,var_to_count_nonzero,n_qcut=10):
     data.drop(columns=[tmpname],inplace=True)
     
     return table_sorted
-
-def print_gainlift_charts(table_sorted):
-    """
-        Program: print_gainlift_charts
-        Author: Siraprapa W.
-        
-        Purpose:print gain lift charts   
-    """
-    fig = plt.figure(figsize=(20,4))
-    fig.subplots_adjust(hspace=0.2,wspace=0.2)
-   
-    fig, axes = plt.subplots(nrows=1, ncols=2)
-    table_sorted.plot(kind='line',x='decile',y=['cumulative_lift','base_lift'],style='o-',
-                      ax=axes[0],figsize=(10,3),title='Cumulative Lift Curve')
-    table_sorted.plot(kind='line',x='decile',y=['cumulative_gain','base_gain'],style='o-',
-                      ax=axes[1],figsize=(10,3),title='Cumulative Gain Curve')
-    
-    # Adding data points over markers for Lift Curve
-    for i, point in table_sorted.iterrows():
-        axes[0].text(point['decile'], point['cumulative_lift'], "{:.1f}".format(point['cumulative_lift'], fontsize=8))
-        #axes[0].text(point['decile'], point['base_lift'], "{:.1f}".format(point['base_lift']))
-
-    # Adding data points over markers for Gain Curve
-    for i, point in table_sorted.iterrows():
-        axes[1].text(point['decile'], point['cumulative_gain'], "{:.1f}".format(point['cumulative_gain'], fontsize=8))
-        #axes[1].text(point['decile'], point['base_gain'], "{:.1f}".format(point['base_gain']))
-
-    #print(table_sorted.set_index('decile').loc[:,[var_to_count_nonzero,'cumulative_gain','cumulative_lift','ks']])
-
-    
-#
-
-def display_gainlift_table(table_sorted,target='target'):
-    display(table_sorted[['decile',target,'cumulative_gain','cumulative_lift','ks']].style.format({'ks':"{:.2%}",
-                    'cumulative_lift':"{:.2f}",
-                    'cumulative_gain':"{:.2f}",
-                     'target':"{:.0f}",
-                     'decile':"{:.0f}",
-                      'index':False,
-                    }))
     
 
 def print_gainlift_table_and_charts(table_sorted,target='target'):
@@ -280,78 +240,34 @@ def generate_miss_report(data):
     miss_report.rename(columns={'index':'features'},inplace=True)
     return miss_report
 
-class MetricContainer:
-    def __init__(self):
-        self.i=0
-        self.model=[]
-        self.desc=[]
-        self.acc=[]
-        self.pc=[]
-        self.rc=[]
-        self.fs=[]
-        self.ap=[]
-        self.rmse=[]
-        self.auc=[]
-        self.gini=[]
-        self.fpr=[]
-        self.fnr=[]
-        self.clift10=[]
-        self.clift20=[]
-        self.clift30=[]
-        
-    def add(self,desc,acc,pc,rc,fs,ap,rmse,auc,gini,fpr,fnr,clift10,clift20,clift30):
-        self.i+=1
-        self.model.append("Model {}".format(self.i))
-        self.desc.append(desc)
-        self.acc.append(acc)
-        self.pc.append(pc)
-        self.rc.append(rc)
-        self.fs.append(fs)
-        self.ap.append(ap)
-        self.rmse.append(rmse)
-        self.auc.append(auc)
-        self.gini.append(gini)
-        self.fpr.append(fpr)
-        self.fnr.append(fnr)
-        self.clift10.append(clift10)
-        self.clift20.append(clift20)
-        self.clift30.append(clift30)
+
+def feature_importance_plot(importance_dict, top_n_features=None):
+
     
-    def get(self):
-        metric = pd.DataFrame([self.model,
-                               self.desc,
-                               self.acc,
-                               self.pc,
-                               self.rc,
-                               self.fs,
-                               self.ap,
-                               self.rmse,
-                               self.auc,
-                               self.gini,
-                               self.fpr,
-                               self.fnr,
-                               self.clift10,
-                               self.clift20,
-                               self.clift30,]).transpose()
-        metric.columns=['model','desc','acc','pc','rc','fs','ap','rmse','auc','gini','fpr','fnr'
-                        ,'clift10','clift20','clift30']
-        metric.set_index('model')
-        
-        return metric
+    # Convert the dictionary to a Pandas DataFrame
+    df = pd.DataFrame(list(importance_dict.items()), columns=['Feature', 'Importance'])
 
-def highlight_max(s):
-    '''
-    highlight the maximum in a Series yellow.
-    '''
-    is_max = s == s.max()
-    return ['background-color: yellow' if v else '' for v in is_max]
+    # Sort the DataFrame by Importance
+    df = df.sort_values('Importance', ascending=False)
+    
+    # Filter the top N features if specified
+    if top_n_features is not None:
+        df = df.head(top_n_features)
+    
+    # Normalize the Importance values to percentages
+    total = df['Importance'].sum()
+    df['Importance_Percentage'] = (df['Importance'] / total) * 100
+    
+    # Plotting
+    plt.figure(figsize=(15, 10))
+    custom_color = (0.2980392156862745, 0.4470588235294118, 0.6901960784313725)
+    sns.barplot(x='Importance_Percentage', y='Feature', data=df,color=custom_color)
+    
+    # Adding data labels
+    for index, value in enumerate(df['Importance_Percentage']):
+        plt.text(value, index, f'{value:.2f}%')
 
-
-def color_negative_red(val):
-    """
-    Takes a scalar and returns a string with
-    the css property `'color: red'` for negative
-    strings, black otherwise.
-    """
-    color = 'red' if val < 0 else 'black'
-    return 'color: %s' % color
+    plt.xlabel('Feature Importance (%)')
+    plt.ylabel('Feature')
+    plt.title('Feature Importance Ranking')
+    plt.show()
