@@ -14,6 +14,19 @@ Python 3.X
 
 This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
 
+# Python Environment Setup
+```sh
+# Create a new conda environment named 'myenv'
+conda create -n myenv python=3.10
+
+# Activate the new environment
+conda activate myenv
+
+# Install packages from requirements.txt
+pip install -r requirements.txt
+```
+
+
 ## Credits
 * Zac Stewart
 * Julie Michelman 
